@@ -1,4 +1,4 @@
-[LeNode](https://lenode.github.io) is a lesser (minimalistic) NodeJS based Web-server
+[LeNode](https://lenode-server.github.io/) is a lesser (minimalistic) NodeJS based Web-server
 ## Features
 #### - Easy setup
 You can setup your server by creating .indexes files by JSON format in any directory like this:
