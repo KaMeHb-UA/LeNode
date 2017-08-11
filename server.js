@@ -125,10 +125,19 @@ function getIndexes(url, _indexes = {}){
 }
 function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead){
     if (app.mainSettings.advancedLogging) console.log(IP + ' requested a page ' + url + ' with GET ' + JSON.stringify(GET) + ' and POST ' + JSON.stringify(POST) + ' arguments');
+    (function(){
+        var routed = false;
+        require('./router').forEach(function(e){
+            if (!routed && e[0].test(url)){
+                url = e[1];
+                routed = true;
+            }
+        });
+    })();
     if (/.*\/\.indexes\/?$/.test(url)) throwError(403, 'Not Allowed');
     fs.lstat('.' + url, (err, stats) => {
         if (!err){
-            if(stats.isFile()){
+            if(stats.isFile() && !(/.*\.js\/?$/.test(url))){
                 try {
                     var contents = fs.readFileSync('.' + url);
                     writeHead({'Content-Type': 'application/octet-stream'});

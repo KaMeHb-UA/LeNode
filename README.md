@@ -14,9 +14,7 @@ You can setup your server by creating .indexes files by JSON format in any direc
     "third_own_index.ext" : {}
 }
 ````
-You can execute any file with any extension as a JS file
-Any directory will get its parent indexes if you don't overwrite them
-
+You can execute any file with any extension as a JS file. Any directory will get its parent indexes if you don't overwrite them
 Next, your executable pages must be created wrapped in page() function like this
 ```` javascript
 page(
