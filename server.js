@@ -63,7 +63,7 @@ http.createServer(function(request, response){
             }
             if (b) response.end(a, null); else response.end(a);
         }
-        route(exit, write, throwError, url, GET, POST, {}, request.headers, (request.connection.remoteAddress == '::1') ? 'localhost' : request.connection.remoteAddress, function(a, b = status){
+        route(exit, write, throwError, url, GET, POST, app.extends(POST, GET), request.headers, (request.connection.remoteAddress == '::1') ? 'localhost' : request.connection.remoteAddress, function(a, b = status){
             headers = app.extends(a, headers);
             status = b;
             response.writeHead(status, headers);
@@ -163,13 +163,12 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                 try {
                     var contents = fs.readFileSync('.' + url, 'utf8');
                     var pH = {}, headersClosed = false;
-                    eval(contents);
+                    eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph){' + contents + '}');
                     exit((function(){
                         var a = page(function(a){
                             if (!headersClosed){
                                 headersClosed = true;
                                 let status = pH.code ? pH.code : 200;
-                                console.log(status);
                                 delete pH.code;
                                 writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
                             }
@@ -205,7 +204,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                         var contents = fs.readFileSync(foundIndex.name, foundIndex.charset);
                         try {
                             var pH = {}, headersClosed = false;
-                            eval(contents);
+                            eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph){' + contents + '}');
                             exit((function(){
                                 var a = page(function(a){
                                     if (!headersClosed){
