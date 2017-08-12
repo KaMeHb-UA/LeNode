@@ -1,0 +1,19 @@
+{
+    "name": "lenode",
+    "version": "1.0.0-f",
+    "main": "./server.js",
+    "repository" :{
+        "type" : "git",
+        "url" : "https://github.com/KaMeHb-UA/LeNode.git"
+    },
+    "description": "NodeJS based minimalistic web-server",
+    "license": "MIT",
+    "keywords": [
+        "lenode",
+        "server",
+        "mini",
+        "tiny",
+        "lesser",
+        "minimalistic"
+    ]
+}
