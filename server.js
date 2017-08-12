@@ -125,23 +125,63 @@ function getIndexes(url, _indexes = {}){
 }
 function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead){
     if (app.mainSettings.advancedLogging) console.log(IP + ' requested a page ' + url + ' with GET ' + JSON.stringify(GET) + ' and POST ' + JSON.stringify(POST) + ' arguments');
+    isFileExecutable = false;
     (function(){
         var routed = false;
         require('./router').forEach(function(e){
-            if (!routed && e[0].test(url)){
-                url = e[1];
-                routed = true;
+            if (typeof e[0] == 'string'){
+                if (!routed && e[0] == url){
+                    url = e[1];
+                    if (e[2]){
+                        isFileExecutable = true;
+                    }
+                    routed = true;
+                }
+            } else {
+                if (!routed && e[0].test(url)){
+                    url = url.replace(e[0], e[1]);
+                    if (e[2]){
+                        isFileExecutable = true;
+                    }
+                    routed = true;
+                }
             }
         });
     })();
-    if (/.*\/\.indexes\/?$/.test(url)) throwError(403, 'Not Allowed');
+    if (url == '/403.code') throwError(403, 'Not Allowed');
     fs.lstat('.' + url, (err, stats) => {
         if (!err){
-            if(stats.isFile() && !(/.*\.js\/?$/.test(url))){
+            if(stats.isFile() && !isFileExecutable){
                 try {
                     var contents = fs.readFileSync('.' + url);
                     writeHead({'Content-Type': 'application/octet-stream'});
                     exit(contents, true);
+                } catch (e){
+                    exit('Unable to load file');
+                }
+            } else if(stats.isFile()){
+                try {
+                    var contents = fs.readFileSync('.' + url, 'utf8');
+                    var pH = {}, headersClosed = false;
+                    eval(contents);
+                    exit((function(){
+                        var a = page(function(a){
+                            if (!headersClosed){
+                                headersClosed = true;
+                                let status = pH.code ? pH.code : 200;
+                                console.log(status);
+                                delete pH.code;
+                                writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                            }
+                            write(a + '');
+                        }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface) + '';
+                        if (!headersClosed){
+                            let status = pH.code ? pH.code : 200;
+                            delete pH.code;
+                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                        }
+                        return a;
+                    })());
                 } catch (e){
                     exit('Unable to load file');
                 }
