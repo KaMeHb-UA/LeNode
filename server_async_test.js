@@ -106,7 +106,7 @@ function getIndexes(url, _indexes = {}){
     var indexes = (function getIndexes(url, indexes){
         if (url != '/'){
             try {
-                var contents = wait.for(fs.readFile('.' + url + '.indexes', 'utf8'));
+                var contents = wait.for(fs.readFile, '.' + url + '.indexes', 'utf8');
                 try {
                     indexes = JSON.parse(contents);
                 } catch (e){
@@ -116,7 +116,7 @@ function getIndexes(url, _indexes = {}){
             return app.extends(indexes, getIndexes(pathUp(url), indexes));
         } else {
             try {
-                var contents = wait.for(fs.readFile('./.indexes', 'utf8'));
+                var contents = wait.for(fs.readFile, './.indexes', 'utf8');
                 try {
                     indexes = JSON.parse(contents);
                 } catch (e){
@@ -158,95 +158,102 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
         });
     })();
     if (url == '/403.code') throwError(403, 'Not Allowed');
-    fs.lstat('.' + url, (err, stats) => {
-        if (!err){
-            if(stats.isFile() && !isFileExecutable){
-                try {
-                    var contents = wait.for(fs.readFile('.' + url));
-                    writeHead({'Content-Type': 'application/octet-stream'});
-                    exit(contents, true);
-                } catch (e){
-                    exit('Unable to load file');
+    if (url == '/404.code') throwError(404, 'Not Found');
+    var do_close = false;
+    try {
+        var stats = wait.for(fs.lstat, '.' + url);
+    } catch (e){
+        do_close = true;
+        throwError(404, 'Not Found');
+    }
+    if (do_close) return;
+    if(stats.isFile() && !isFileExecutable){
+        try {
+            var contents = wait.for(fs.readFile, '.' + url);
+            writeHead({'Content-Type': 'application/octet-stream'});
+            exit(contents, true);
+        } catch (e){
+            exit('Unable to load file');
+        }
+        return; //не, ну тут полюбасу
+    } else if(stats.isFile()){
+        try {
+            var contents = wait.for(fs.readFile, '.' + url, 'utf8');
+            var pH = {}, headersClosed = false;
+            //eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,___xFn_FM_CB){var exit = function(a){___xFn_FM_CB(null, a)};' + contents + '}');
+            eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit){' + contents + '}');
+            exit((function(){
+                var a = wait.for(page, function(a){
+                    if (!headersClosed){
+                        headersClosed = true;
+                        let status = pH.code ? pH.code : 200;
+                        delete pH.code;
+                        writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                    }
+                    write(a + '');
+                }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface) + '';
+                if (!headersClosed){
+                    let status = pH.code ? pH.code : 200;
+                    delete pH.code;
+                    writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
                 }
-            } else if(stats.isFile()){
+                return a;
+            })());
+        } catch (e){
+            exit('Unable to load file');
+        }
+        return; //не, ну тут тоже полюбасу
+    } else {
+        var foundIndex = false;
+        (function(url){
+            var indexes = getIndexes(url);
+            for (var i in indexes){
+                if (wait.for(fs.access, '.' + url + i)){
+                    foundIndex = {
+                        name : '.' + url + i,
+                        executable : !!(indexes[i].executable),
+                        charset : indexes[i].charset
+                    };
+                }
+            }
+        })(/\/$/.test(url) ? url : (url + '/'));
+        if (!foundIndex) throwError(404, 'Not Found'); else {
+            try {
+                var contents = wait.for(fs.readFile, foundIndex.name, foundIndex.charset);
                 try {
-                    var contents = wait.for(fs.readFile('.' + url, 'utf8'));
                     var pH = {}, headersClosed = false;
-                    eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph){' + contents + '}');
+                    eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,___xFn_FM_CB){___xFn_FM_CB(null, (function(___xFn_FM_CB){' + contents + '})())}');
                     exit((function(){
-                        var a = wait.for(page(function(a){
+                        var a = wait.for(page, function(a){
                             if (!headersClosed){
                                 headersClosed = true;
                                 let status = pH.code ? pH.code : 200;
+                                console.log(status);
                                 delete pH.code;
-                                writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                                writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
                             }
                             write(a + '');
-                        }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface)) + '';
+                        }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface) + '';
                         if (!headersClosed){
                             let status = pH.code ? pH.code : 200;
                             delete pH.code;
-                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
                         }
                         return a;
                     })());
+                    page = undefined;
+                    pH = {};
                 } catch (e){
-                    exit('Unable to load file');
+                    exit(e.stack);
                 }
-            } else {
-                var foundIndex = false;
-                (function(url){
-                    var indexes = getIndexes(url);
-                    for (var i in indexes){
-                        if (wait.for(fs.access('.' + url + i))){
-                            foundIndex = {
-                                name : '.' + url + i,
-                                executable : !!(indexes[i].executable),
-                                charset : indexes[i].charset
-                            };
-                            return;
-                        }
-                    }
-                })(/\/$/.test(url) ? url : (url + '/'));
-                if (!foundIndex) throwError(404, 'Not Found'); else {
-                    try {
-                        var contents = wait.for(fs.readFile(foundIndex.name, foundIndex.charset));
-                        try {
-                            var pH = {}, headersClosed = false;
-                            eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph){' + contents + '}');
-                            exit((function(){
-                                var a = wait.for(page(function(a){
-                                    if (!headersClosed){
-                                        headersClosed = true;
-                                        let status = pH.code ? pH.code : 200;
-                                        console.log(status);
-                                        delete pH.code;
-                                        writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
-                                    }
-                                    write(a + '');
-                                }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface)) + '';
-                                if (!headersClosed){
-                                    let status = pH.code ? pH.code : 200;
-                                    delete pH.code;
-                                    writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
-                                }
-                                return a;
-                            })());
-                            page = undefined;
-                            pH = {};
-                        } catch (e){
-                            exit(e.stack);
-                        }
-                    } catch (e){
-                        exit('Error: cannot read index file');
-                    }
-                }
+            } catch (e){
+                exit('Error: cannot read index file');
             }
-        } else {
-            throwError(404, 'Not Found');
         }
-    });
+    }
+    /*
     setTimeout(function(){
         exit();
     }, app.mainSettings.serverTimeout);
+    */
 }
