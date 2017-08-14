@@ -1,7 +1,8 @@
-var http = require('http');
-var qs = require('querystring');
-var fs = require("fs");
-var polymorph = require('./polymorph');
+var http = require('http'),
+    qs = require('querystring'),
+    fs = require("fs"),
+    polymorph = require('./polymorph'),
+    wait = require('wait.for');
 
 var app = {
     extends: function(who, from){
@@ -63,7 +64,15 @@ http.createServer(function(request, response){
             }
             if (b) response.end(a, null); else response.end(a);
         }
+        /*
         route(exit, write, throwError, url, GET, POST, app.extends(POST, GET), request.headers, (request.connection.remoteAddress == '::1') ? 'localhost' : request.connection.remoteAddress, function(a, b = status){
+            headers = app.extends(a, headers);
+            status = b;
+            response.writeHead(status, headers);
+            HeadersSent = true;
+        });
+        */
+        wait.launchFiber(route, exit, write, throwError, url, GET, POST, app.extends(POST, GET), request.headers, (request.connection.remoteAddress == '::1') ? 'localhost' : request.connection.remoteAddress, function(a, b = status){
             headers = app.extends(a, headers);
             status = b;
             response.writeHead(status, headers);
@@ -97,7 +106,7 @@ function getIndexes(url, _indexes = {}){
     var indexes = (function getIndexes(url, indexes){
         if (url != '/'){
             try {
-                var contents = fs.readFileSync('.' + url + '.indexes', 'utf8');
+                var contents = wait.for(fs.readFile('.' + url + '.indexes', 'utf8'));
                 try {
                     indexes = JSON.parse(contents);
                 } catch (e){
@@ -107,7 +116,7 @@ function getIndexes(url, _indexes = {}){
             return app.extends(indexes, getIndexes(pathUp(url), indexes));
         } else {
             try {
-                var contents = fs.readFileSync('./.indexes', 'utf8');
+                var contents = wait.for(fs.readFile('./.indexes', 'utf8'));
                 try {
                     indexes = JSON.parse(contents);
                 } catch (e){
@@ -153,7 +162,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
         if (!err){
             if(stats.isFile() && !isFileExecutable){
                 try {
-                    var contents = fs.readFileSync('.' + url);
+                    var contents = wait.for(fs.readFile('.' + url));
                     writeHead({'Content-Type': 'application/octet-stream'});
                     exit(contents, true);
                 } catch (e){
@@ -161,11 +170,11 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                 }
             } else if(stats.isFile()){
                 try {
-                    var contents = fs.readFileSync('.' + url, 'utf8');
+                    var contents = wait.for(fs.readFile('.' + url, 'utf8'));
                     var pH = {}, headersClosed = false;
                     eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph){' + contents + '}');
                     exit((function(){
-                        var a = page(function(a){
+                        var a = wait.for(page(function(a){
                             if (!headersClosed){
                                 headersClosed = true;
                                 let status = pH.code ? pH.code : 200;
@@ -173,7 +182,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                 writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
                             }
                             write(a + '');
-                        }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface) + '';
+                        }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface)) + '';
                         if (!headersClosed){
                             let status = pH.code ? pH.code : 200;
                             delete pH.code;
@@ -189,7 +198,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                 (function(url){
                     var indexes = getIndexes(url);
                     for (var i in indexes){
-                        if (fs.existsSync('.' + url + i)){
+                        if (wait.for(fs.access('.' + url + i))){
                             foundIndex = {
                                 name : '.' + url + i,
                                 executable : !!(indexes[i].executable),
@@ -201,12 +210,12 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                 })(/\/$/.test(url) ? url : (url + '/'));
                 if (!foundIndex) throwError(404, 'Not Found'); else {
                     try {
-                        var contents = fs.readFileSync(foundIndex.name, foundIndex.charset);
+                        var contents = wait.for(fs.readFile(foundIndex.name, foundIndex.charset));
                         try {
                             var pH = {}, headersClosed = false;
                             eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph){' + contents + '}');
                             exit((function(){
-                                var a = page(function(a){
+                                var a = wait.for(page(function(a){
                                     if (!headersClosed){
                                         headersClosed = true;
                                         let status = pH.code ? pH.code : 200;
@@ -215,7 +224,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                         writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
                                     }
                                     write(a + '');
-                                }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface) + '';
+                                }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface)) + '';
                                 if (!headersClosed){
                                     let status = pH.code ? pH.code : 200;
                                     delete pH.code;
