@@ -11,30 +11,35 @@ var app = {
         return who;
     },
 
-/* Пользовательские настройки */
+/* User settings */
 
     mainSettings : {
-        defaultIndex : /* Настройки индекстного файла по умолчанию */{
-            executable : false, //выполнять ли файл,
-            charset : 'utf8', //кодировка
+        defaultIndex : /* Default single index file settings */{
+            executable : false, // do execute?,
+            charset : 'utf8', // file encoding
         },
-        defaultIndexes : /* Список индексов для корневой директории по умолчанию. ВНИМАНИЕ!!! Индексы всех папок наследуются от родителей! */ {
+        defaultIndexes : /* Indexes list by default. WARNING!!! All indexes are about inheriting parents! */ {
             'index.js' : {
                 executable : true,
             },
             'index2.html' : {},
         },
-//        advancedLogging : true,
-        serverTimeout : 10000, // 10 сек. на автозакрытие соединения
+        advancedLogging : true,
+        serverTimeout : 10000, // 10 secs. to autoclose connection
+        asyncInterface : false, // On/off async server mode. Are only about the server; pages may been wroten any way
     }
 };
-
-// only for META
-// класс - пустышка
-class returnedObject extends Object {};
-//потом сделаю описание
-LeNode = new (class extends Object{})();
-LeNode.ErrnoException = class extends Error{};
+// empty class for JSDoc
+class Objеct /* e is cyrillic ¯\_(ツ)_/¯ (all about pretty code) */ extends Object {};
+// custom error definition
+class LeNodeError extends Error {
+    constructor(message, errno = -1){
+        super(message);
+        this.errno = errno;
+        this.message = errno + ' (' + this.message + ')\nat' + this.stack.split('at', 2)[1]
+        this.stack = 'Error ' + this.message;
+    }
+}
 
 http.createServer(function(request, response){
     var POST = {};
@@ -101,42 +106,50 @@ function pathUp(path){ //only canonnical (with / on end) supported
     path2 = undefined;
     return path;
 }
-function getIndexes(url, _indexes = {}){
-    var indexes = (function getIndexes(url, indexes){
-        if (url != '/'){
-            try {
-                var contents = fs.readFileSync('.' + url + '.indexes', 'utf8');
+/**
+ * Gets indexes synchronous
+ * @param {String} url The link for getting indexes
+ * @return {Objеct}
+ */
+function getIndexesSync(url){
+    return (function(url, _indexes){
+        var indexes = (function getIndexes(url, indexes){
+            if (url != '/'){
                 try {
-                    indexes = JSON.parse(contents);
-                } catch (e){
-                    if (app.mainSettings.advancedLogging) console.error('Ошибка чтения индексов из файла .' + url + '.indexes');
-                }
-            } catch (e){}
-            return app.extends(indexes, getIndexes(pathUp(url), indexes));
-        } else {
-            try {
-                var contents = fs.readFileSync('./.indexes', 'utf8');
+                    var contents = fs.readFileSync('.' + url + '.indexes', 'utf8');
+                    try {
+                        indexes = JSON.parse(contents);
+                    } catch (e){
+                        if (app.mainSettings.advancedLogging) console.error('Error reading indexes from file .' + url + '.indexes');
+                    }
+                } catch (e){}
+                return app.extends(indexes, getIndexes(pathUp(url), indexes));
+            } else {
                 try {
-                    indexes = JSON.parse(contents);
-                } catch (e){
-                    if (app.mainSettings.advancedLogging) console.error('Ошибка чтения индексов из файла .' + url + '.indexes');
-                }
-            } catch (e){}
-            indexes = app.extends(indexes, app.mainSettings.defaultIndexes);
-            return indexes;
+                    var contents = fs.readFileSync('./.indexes', 'utf8');
+                    try {
+                        indexes = JSON.parse(contents);
+                    } catch (e){
+                        if (app.mainSettings.advancedLogging) console.error('Error reading indexes from file .' + url + '.indexes');
+                    }
+                } catch (e){}
+                indexes = app.extends(indexes, app.mainSettings.defaultIndexes);
+                return indexes;
+            }
+        })(url, _indexes);
+        for(var i in indexes){
+            indexes[i] = app.extends(indexes[i], app.mainSettings.defaultIndex);
         }
-    })(url, _indexes);
-    for(var i in indexes){
-        indexes[i] = app.extends(indexes[i], app.mainSettings.defaultIndex);
-    }
-    return indexes;
+        return indexes;
+    })(url, {});
 }
 /**
+ * Gets indexes asynchronous
  * @param {String} url The link for getting indexes
- * @param {function(NodeJS.ErrnoException, returnedObject):void} callback Standard NodeJS callback
+ * @param {function(LeNodeError, Objеct):void} callback Standard NodeJS callback
  * @return {Void}
  */
-function getIndexesAsync(url, callback){
+function getIndexes(url, callback){
     (function getIndexesAsyncRecursively(url, _indexes, callback){
         if (url != '/'){
             fs.readFile('.' + url + '.indexes', 'utf8', function(err, contents){
@@ -144,8 +157,8 @@ function getIndexesAsync(url, callback){
                     try {
                         getIndexesAsyncRecursively(pathUp(url), app.extends(JSON.parse(contents), _indexes), callback);
                     } catch (e){
-                        if (app.mainSettings.advancedLogging) console.error('Ошибка чтения индексов из файла .' + url + '.indexes');
-                        callback(new LeNode.ErrnoException('Error parsing .' + url + '.indexes file'), null);
+                        if (app.mainSettings.advancedLogging) console.error('Error reading indexes from file .' + url + '.indexes');
+                        callback(new LeNodeError('cannot parse .' + url + '.indexes file'), null);
                     }
                 } else {
                     getIndexesAsyncRecursively(pathUp(url), _indexes, callback);
@@ -161,8 +174,8 @@ function getIndexesAsync(url, callback){
                         }
                         callback(null, _indexes);
                     } catch (e){
-                        if (app.mainSettings.advancedLogging) console.error('Ошибка чтения индексов из файла ./.indexes');
-                        callback(new LeNode.ErrnoException('Error parsing ./.indexes file'), null);
+                        if (app.mainSettings.advancedLogging) console.error('Error reading indexes from file ./.indexes');
+                        callback(new LeNodeError('cannot parse ./.indexes file'), null);
                     }
                 } else {
                     for(var i in _indexes){
@@ -174,14 +187,21 @@ function getIndexesAsync(url, callback){
         }
     })(url, app.mainSettings.defaultIndexes, callback);
 }
+/**
+ * Routs specific URI synchronous
+ * @param {function((String|Buffer), boolean=):void} exit Sends info and closes connection (to send buffer instead of string, use second parameter as true)
+ * @param {function((String|Buffer), boolean=):void} write Sends info but not closes connection (to send buffer instead of string, use second parameter as true)
+ * @param {function(number, string):void} throwError Sends headers with custom code (404, 403 etc.)
+ * @param {String} url Link for routing
+ * @param {Objеct} GET A $_GET PHP analogue
+ * @param {Objеct} POST A $_POST PHP analogue
+ * @param {Objеct} REQUEST A $_REQUEST PHP analogue
+ * @param {Objеct} headers Associative array like object with all the request headers
+ * @param {String} IP Remote user IP adress
+ * @param {function(Objеct, number=):void} writeHead Writes headers to the queue (exist headers will be replaced) and/or sets responce code. Works until headers are not sent
+ * @return {Void}
+ */
 function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead){
-    getIndexesAsync(url, function(err, obj){
-        if (!err) {
-            console.log('I\'ve found indexes ' + JSON.stringify(obj) + ' asynchronously and indexes ' + JSON.stringify(getIndexes(url)) + ' synchronously');
-        } else {
-            console.log('Error while finding indexes: ' + err.stack);
-        }
-    });
     if (app.mainSettings.advancedLogging) console.log(IP + ' requested a page ' + url + ' with GET ' + JSON.stringify(GET) + ' and POST ' + JSON.stringify(POST) + ' arguments');
     isFileExecutable = false;
     (function(){
@@ -245,7 +265,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
             } else {
                 var foundIndex = false;
                 (function(url){
-                    var indexes = getIndexes(url);
+                    var indexes = getIndexesSync(url);
                     for (var i in indexes){
                         if (fs.existsSync('.' + url + i)){
                             foundIndex = {
