@@ -28,6 +28,14 @@ var app = {
         serverTimeout : 10000, // 10 сек. на автозакрытие соединения
     }
 };
+
+// only for META
+// класс - пустышка
+class returnedObject extends Object {};
+//потом сделаю описание
+LeNode = new (class extends Object{})();
+LeNode.ErrnoException = class extends Error{};
+
 http.createServer(function(request, response){
     var POST = {};
     function do_route(POST){
@@ -123,7 +131,57 @@ function getIndexes(url, _indexes = {}){
     }
     return indexes;
 }
+/**
+ * @param {String} url The link for getting indexes
+ * @param {function(NodeJS.ErrnoException, returnedObject):void} callback Standard NodeJS callback
+ * @return {Void}
+ */
+function getIndexesAsync(url, callback){
+    (function getIndexesAsyncRecursively(url, _indexes, callback){
+        if (url != '/'){
+            fs.readFile('.' + url + '.indexes', 'utf8', function(err, contents){
+                if (!err){
+                    try {
+                        getIndexesAsyncRecursively(pathUp(url), app.extends(JSON.parse(contents), _indexes), callback);
+                    } catch (e){
+                        if (app.mainSettings.advancedLogging) console.error('Ошибка чтения индексов из файла .' + url + '.indexes');
+                        callback(new LeNode.ErrnoException('Error parsing .' + url + '.indexes file'), null);
+                    }
+                } else {
+                    getIndexesAsyncRecursively(pathUp(url), _indexes, callback);
+                }
+            });
+        } else {
+            fs.readFile('./.indexes', 'utf8', function(err, contents){
+                if (!err){
+                    try {
+                        _indexes = app.extends(JSON.parse(contents), _indexes);
+                        for(var i in _indexes){
+                            _indexes[i] = app.extends(_indexes[i], app.mainSettings.defaultIndex);
+                        }
+                        callback(null, _indexes);
+                    } catch (e){
+                        if (app.mainSettings.advancedLogging) console.error('Ошибка чтения индексов из файла ./.indexes');
+                        callback(new LeNode.ErrnoException('Error parsing ./.indexes file'), null);
+                    }
+                } else {
+                    for(var i in _indexes){
+                        _indexes[i] = app.extends(_indexes[i], app.mainSettings.defaultIndex);
+                    }
+                    callback(null, _indexes);
+                }
+            });
+        }
+    })(url, app.mainSettings.defaultIndexes, callback);
+}
 function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead){
+    getIndexesAsync(url, function(err, obj){
+        if (!err) {
+            console.log('I\'ve found indexes ' + JSON.stringify(obj) + ' asynchronously and indexes ' + JSON.stringify(getIndexes(url)) + ' synchronously');
+        } else {
+            console.log('Error while finding indexes: ' + err.stack);
+        }
+    });
     if (app.mainSettings.advancedLogging) console.log(IP + ' requested a page ' + url + ' with GET ' + JSON.stringify(GET) + ' and POST ' + JSON.stringify(POST) + ' arguments');
     isFileExecutable = false;
     (function(){

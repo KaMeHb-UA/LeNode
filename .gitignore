@@ -4,3 +4,6 @@
 
 #Модули нода
 node_modules
+
+#Тесты
+test
