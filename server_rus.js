@@ -26,7 +26,7 @@ var app = {
         },
         advancedLogging : true,
         serverTimeout : 10000, // 10 сек. на автозакрытие соединения
-        asyncInterface : false, // Вкл/выкл асинхронный режим сервера. Влияет только на сам сервер; страницы же могут быть написаны любым подходом
+        asyncInterface : true, // Вкл/выкл асинхронный режим сервера. Влияет только на сам сервер; страницы же могут быть написаны любым подходом
     }
 };
 // класс-пустышка для JSDoc
@@ -76,12 +76,27 @@ http.createServer(function(request, response){
             }
             if (b) response.end(a, null); else response.end(a);
         }
-        route(exit, write, throwError, url, GET, POST, app.extends(POST, GET), request.headers, (request.connection.remoteAddress == '::1') ? 'localhost' : request.connection.remoteAddress, function(a, b = status){
-            headers = app.extends(a, headers);
-            status = b;
-            response.writeHead(status, headers);
-            HeadersSent = true;
-        });
+        if (app.mainSettings.asyncInterface){
+            route(exit, write, throwError, url, GET, POST, app.extends(POST, GET), request.headers, (request.connection.remoteAddress == '::1') ? 'localhost' : request.connection.remoteAddress, function(a, b = status){
+                headers = app.extends(a, headers);
+                status = b;
+                response.writeHead(status, headers);
+                HeadersSent = true;
+            }, (err) => {
+                if (err) console.error(err);
+            });
+        } else {
+            try {
+                routeSync(exit, write, throwError, url, GET, POST, app.extends(POST, GET), request.headers, (request.connection.remoteAddress == '::1') ? 'localhost' : request.connection.remoteAddress, function(a, b = status){
+                    headers = app.extends(a, headers);
+                    status = b;
+                    response.writeHead(status, headers);
+                    HeadersSent = true;
+                });
+            } catch (err){
+                console.error(err);
+            }
+        }
     }
     if (request.method == 'POST'){
         var body = '';
@@ -201,7 +216,7 @@ function getIndexes(url, callback){
  * @param {function(Objеct, number=):void} writeHead Пишет заголовки в очередь (существующие будут заменены) и/или задаёт код ответа. Работает до первой отправки заголовков
  * @return {Void}
  */
-function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead){
+function routeSync(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead){
     if (app.mainSettings.advancedLogging) console.log(IP + ' запросил страницу ' + url + ' с GET ' + JSON.stringify(GET) + ' и POST ' + JSON.stringify(POST) + ' аргументами');
     isFileExecutable = false;
     (function(){
@@ -313,6 +328,200 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
             }
         } else {
             throwError(404, 'Not Found');
+        }
+    });
+    setTimeout(function(){
+        exit();
+    }, app.mainSettings.serverTimeout);
+}
+/**
+ * Направляет заданую ссылку асинхронно
+ * @param {function((String|Buffer), boolean=):void} exit Отправляет информацию и закрывает соединение (чтобы отправить буфер вместо строки, используйте второй параметр как true)
+ * @param {function((String|Buffer), boolean=):void} write Отправляет информацию, но не закрывает соединение (чтобы отправить буфер вместо строки, используйте второй параметр как true)
+ * @param {function(number, string):void} throwError Отправляет заголовки с произвольным кодом ответа (404, 403 и т.п.)
+ * @param {String} url Сама ссылка для направления
+ * @param {Objеct} GET $_GET PHP аналог
+ * @param {Objеct} POST $_POST PHP аналог
+ * @param {Objеct} REQUEST $_REQUEST PHP аналог
+ * @param {Objеct} headers Объект (ассоциативный массив) со всеми заголовками запроса
+ * @param {String} IP IP адрес пользователя
+ * @param {function(Objеct, number=):void} writeHead Пишет заголовки в очередь (существующие будут заменены) и/или задаёт код ответа. Работает до первой отправки заголовков
+ * @param {function(LeNodeError):void} callback Обычный NodeJS-коллбэк
+ * @return {Void}
+ */
+function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead, callback){
+    if (app.mainSettings.advancedLogging) console.log(IP + ' запросил страницу ' + url + ' с GET ' + JSON.stringify(GET) + ' и POST ' + JSON.stringify(POST) + ' аргументами');
+    isFileExecutable = false;
+    (function(){
+        var routed = false;
+        require('./router').forEach(function(e){
+            if (typeof e[0] == 'string'){
+                if (!routed && e[0] == url){
+                    url = e[1];
+                    if (e[2]){
+                        isFileExecutable = true;
+                    }
+                    routed = true;
+                }
+            } else {
+                if (!routed && e[0].test(url)){
+                    url = url.replace(e[0], e[1]);
+                    if (e[2]){
+                        isFileExecutable = true;
+                    }
+                    routed = true;
+                }
+            }
+        });
+    })();
+    if (url == '/403.code') throwError(403, 'Not Allowed');
+    fs.lstat('.' + url, (err, stats) => {
+        if (!err){
+            if(stats.isFile() && !isFileExecutable){
+                fs.readFile('.' + url, (err, buffer) => {
+                    if (!err){
+                        writeHead({'Content-Type': 'application/octet-stream'});
+                        exit(buffer, true);
+                        callback(null);
+                    } else {
+                        exit('Unable to load file');
+                        callback(new LeNodeError('cannot read file ' + url));
+                    }
+                });
+            } else if(stats.isFile()){
+                fs.readFile('.' + url, 'utf8', (err, contents) => {
+                    if (!err){
+                        var pH = {}, headersClosed = false;
+                        try{
+                            eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit){' + contents + '}');
+                            try{
+                                let result = page(function(a){
+                                    if (!headersClosed){
+                                        headersClosed = true;
+                                        let status = pH.code ? pH.code : 200;
+                                        delete pH.code;
+                                        writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                                    }
+                                    write(a + '');
+                                }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface, function(a){
+                                    if (!headersClosed){
+                                        let status = pH.code ? pH.code : 200;
+                                        delete pH.code;
+                                        writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                                    }
+                                    if (typeof a != 'undefined') exit(a + ''); else exit('');
+                                });
+                                if (typeof result != 'undefined'){
+                                    if (!headersClosed){
+                                        let status = pH.code ? pH.code : 200;
+                                        delete pH.code;
+                                        writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                                    }
+                                    exit(result + '');
+                                }
+                                callback(null);
+                            } catch (e){
+                                exit('Unable to load file');
+                                callback(new LeNodeError('Error in synchronous part of page ' + url));
+                            }
+                        } catch (e){
+                            exit('Unable to load file');
+                            callback(new LeNodeError('syntax error at file ' + url));
+                        }
+                    } else {
+                        exit('Unable to load file');
+                        callback(new LeNodeError('cannot read file ' + url));
+                    }
+                });
+            } else {
+                if (/\/$/.test(url)){
+                    getIndexes(/\/$/.test(url) ? url : (url + '/'), (err, indexes) => {
+                        if (!err){
+                            var tmpStack = [];
+                            for (var i in indexes){
+                                tmpStack.push(i);
+                            }
+                            (function retFirstIndex(i, url){
+                                if (i != tmpStack.length){
+                                    fs.access('.' + url + tmpStack[i], (err) => {
+                                        if (!err){
+                                            ((foundIndex) => {
+                                                fs.readFile(foundIndex.name, foundIndex.charset, (err, contents) => {
+                                                    if (!err){
+                                                        if (foundIndex.executable){
+                                                            var pH = {}, headersClosed = false;
+                                                            try{
+                                                                eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit){' + contents + '}');
+                                                                try{
+                                                                    let result = page(function(a){
+                                                                        if (!headersClosed){
+                                                                            headersClosed = true;
+                                                                            let status = pH.code ? pH.code : 200;
+                                                                            delete pH.code;
+                                                                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
+                                                                        }
+                                                                        write(a + '');
+                                                                    }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface, function(a){
+                                                                        if (!headersClosed){
+                                                                            let status = pH.code ? pH.code : 200;
+                                                                            delete pH.code;
+                                                                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
+                                                                        }
+                                                                        if (typeof a != 'undefined') exit(a + ''); else exit('');
+                                                                    });
+                                                                    if (typeof result != 'undefined'){
+                                                                        if (!headersClosed){
+                                                                            let status = pH.code ? pH.code : 200;
+                                                                            delete pH.code;
+                                                                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
+                                                                        }
+                                                                        exit(result + '');
+                                                                    }
+                                                                    callback(null);
+                                                                } catch (e){
+                                                                    throwError(404, 'Not Found');
+                                                                    callback(new LeNodeError('Error in synchronous part of page ' + url));
+                                                                }
+                                                            } catch (e){
+                                                                throwError(404, 'Not Found');
+                                                                callback(new LeNodeError('syntax error at file ' + url));
+                                                            }
+                                                        } else {
+                                                            writeHead({'Content-Type': 'text/html;charset=' + foundIndex.charset}, 200);
+                                                            exit(contents);
+                                                            callback(null);
+                                                        }
+                                                    } else {
+                                                        throwError(404, 'Not Found');
+                                                        callback(new LeNodeError('cannot read index file ' + url));
+                                                    }
+                                                });
+                                            })({
+                                                name : '.' + url + tmpStack[i],
+                                                executable : !!(indexes[tmpStack[i]].executable),
+                                                charset : indexes[tmpStack[i]].charset
+                                            });
+                                        } else retFirstIndex(++i, url);
+                                    });
+                                } else {
+                                    throwError(404, 'Not Found');
+                                    callback(null);
+                                }
+                            })(0, url);
+                        } else {
+                            throwError(404, 'Not Found');
+                            callback(null);
+                        }
+                    });
+                } else {
+                    writeHead({'Location': url + '/'}, 301);
+                    exit('');
+                    callback(null);
+                }
+            }
+        } else {
+            throwError(404, 'Not Found');
+            callback(null);
         }
     });
     setTimeout(function(){
