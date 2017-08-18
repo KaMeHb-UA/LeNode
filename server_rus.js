@@ -275,7 +275,8 @@ function routeSync(exit, write, throwError, url, GET, POST, REQUEST, headers, IP
                         return a;
                     })());
                 } catch (e){
-                    exit('Unable to load file');
+                    throwError(404, 'Not Found');
+                    console.log(new LeNodeError('cannot read file ' + url));
                 }
             } else {
                 var foundIndex = false;
@@ -322,7 +323,8 @@ function routeSync(exit, write, throwError, url, GET, POST, REQUEST, headers, IP
                             exit(e.stack);
                         }
                     } catch (e){
-                        exit('Error: cannot read index file');
+                        throwError(404, 'Not Found');
+                        console.log(new LeNodeError('cannot read index file ' + foundIndex.name));
                     }
                 }
             }
@@ -331,7 +333,7 @@ function routeSync(exit, write, throwError, url, GET, POST, REQUEST, headers, IP
         }
     });
     setTimeout(function(){
-        exit();
+        exit('');
     }, app.mainSettings.serverTimeout);
 }
 /**
@@ -493,7 +495,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                                         }
                                                     } else {
                                                         throwError(404, 'Not Found');
-                                                        callback(new LeNodeError('cannot read index file ' + url));
+                                                        callback(new LeNodeError('cannot read index file ' + foundIndex.name));
                                                     }
                                                 });
                                             })({
@@ -525,6 +527,6 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
         }
     });
     setTimeout(function(){
-        exit();
+        exit('');
     }, app.mainSettings.serverTimeout);
 }
