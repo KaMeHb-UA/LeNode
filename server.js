@@ -255,7 +255,7 @@ function routeSync(exit, write, throwError, url, GET, POST, REQUEST, headers, IP
                     var contents = fs.readFileSync('.' + url, 'utf8');
                     var pH = {}, headersClosed = false;
                     try{
-                        eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit){' + contents + '}');
+                        eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + contents + '}');
                         try{
                             let result = page(function(a){
                                 if (!headersClosed){
@@ -315,7 +315,7 @@ function routeSync(exit, write, throwError, url, GET, POST, REQUEST, headers, IP
                             if (foundIndex.executable){
                                 let pH = {}, headersClosed = false;
                                 try{
-                                    eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit){' + contents + '}');
+                                    eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + contents + '}');
                                     try{
                                         let result = page(function(a){
                                             if (!headersClosed){
@@ -431,7 +431,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                     if (!err){
                         var pH = {}, headersClosed = false;
                         try{
-                            eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit){' + contents + '}');
+                            eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + contents + '}');
                             try{
                                 let result = page(function(a){
                                     if (!headersClosed){
@@ -489,7 +489,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                                         if (foundIndex.executable){
                                                             let pH = {}, headersClosed = false;
                                                             try{
-                                                                eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit){' + contents + '}');
+                                                                eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + contents + '}');
                                                                 try{
                                                                     let result = page(function(a){
                                                                         if (!headersClosed){
