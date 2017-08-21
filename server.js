@@ -1,7 +1,6 @@
 var http = require('http'),
     qs = require('querystring'),
     fs = require("fs"),
-    polymorph = require('./polymorph'),
     router = require('./.router'),
 
 app = {
@@ -255,7 +254,13 @@ function routeSync(exit, write, throwError, url, GET, POST, REQUEST, headers, IP
                     var contents = fs.readFileSync('.' + url, 'utf8');
                     var pH = {}, headersClosed = false;
                     try{
-                        eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + contents + '}');
+                        eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
+                            varStr = '';
+                            for(var i in app.mainSettings.additionalModules){
+                                varStr += 'var ' + i + ' = addons["' + i + '"];\n';
+                            }
+                            return varStr + 'addons = undefined;\n';
+                        })() + contents + '}');
                         try{
                             let result = page(function(a){
                                 if (!headersClosed){
@@ -265,14 +270,14 @@ function routeSync(exit, write, throwError, url, GET, POST, REQUEST, headers, IP
                                     writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf8'}), status);
                                 }
                                 write(a + '');
-                            }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface, function(a){
+                            }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, function(a){
                                 if (!headersClosed){
                                     let status = pH.code ? pH.code : 200;
                                     delete pH.code;
                                     writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf8'}), status);
                                 }
                                 if (typeof a != 'undefined') exit(a + ''); else exit('');
-                            });
+                            }, app.mainSettings.additionalModules);
                             if (typeof result != 'undefined'){
                                 if (!headersClosed){
                                     let status = pH.code ? pH.code : 200;
@@ -315,7 +320,13 @@ function routeSync(exit, write, throwError, url, GET, POST, REQUEST, headers, IP
                             if (foundIndex.executable){
                                 let pH = {}, headersClosed = false;
                                 try{
-                                    eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + contents + '}');
+                                    eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
+                                        varStr = '';
+                                        for(var i in app.mainSettings.additionalModules){
+                                            varStr += 'var ' + i + ' = addons["' + i + '"];\n';
+                                        }
+                                        return varStr + 'addons = undefined;\n';
+                                    })() + contents + '}');
                                     try{
                                         let result = page(function(a){
                                             if (!headersClosed){
@@ -325,14 +336,14 @@ function routeSync(exit, write, throwError, url, GET, POST, REQUEST, headers, IP
                                                 writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
                                             }
                                             write(a + '');
-                                        }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface, function(a){
+                                        }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, function(a){
                                             if (!headersClosed){
                                                 let status = pH.code ? pH.code : 200;
                                                 delete pH.code;
                                                 writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
                                             }
                                             if (typeof a != 'undefined') exit(a + ''); else exit('');
-                                        });
+                                        }, app.mainSettings.additionalModules);
                                         if (typeof result != 'undefined'){
                                             if (!headersClosed){
                                                 let status = pH.code ? pH.code : 200;
@@ -431,7 +442,13 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                     if (!err){
                         var pH = {}, headersClosed = false;
                         try{
-                            eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + contents + '}');
+                            eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
+                                varStr = '';
+                                for(var i in app.mainSettings.additionalModules){
+                                    varStr += 'var ' + i + ' = addons["' + i + '"];\n';
+                                }
+                                return varStr + 'addons = undefined;\n';
+                            })() + contents + '}');
                             try{
                                 let result = page(function(a){
                                     if (!headersClosed){
@@ -441,14 +458,14 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                         writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
                                     }
                                     write(a + '');
-                                }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface, function(a){
+                                }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, function(a){
                                     if (!headersClosed){
                                         let status = pH.code ? pH.code : 200;
                                         delete pH.code;
                                         writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
                                     }
                                     if (typeof a != 'undefined') exit(a + ''); else exit('');
-                                });
+                                }, app.mainSettings.additionalModules);
                                 if (typeof result != 'undefined'){
                                     if (!headersClosed){
                                         let status = pH.code ? pH.code : 200;
@@ -489,7 +506,13 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                                         if (foundIndex.executable){
                                                             let pH = {}, headersClosed = false;
                                                             try{
-                                                                eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,polymorph,exit' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + contents + '}');
+                                                                eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
+                                                                    varStr = '';
+                                                                    for(var i in app.mainSettings.additionalModules){
+                                                                        varStr += 'var ' + i + ' = addons["' + i + '"];\n';
+                                                                    }
+                                                                    return varStr + 'addons = undefined;\n';
+                                                                })() + contents + '}');
                                                                 try{
                                                                     let result = page(function(a){
                                                                         if (!headersClosed){
@@ -499,14 +522,14 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                                                             writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
                                                                         }
                                                                         write(a + '');
-                                                                    }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, polymorph.mainInterface, function(a){
+                                                                    }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, function(a){
                                                                         if (!headersClosed){
                                                                             let status = pH.code ? pH.code : 200;
                                                                             delete pH.code;
                                                                             writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
                                                                         }
                                                                         if (typeof a != 'undefined') exit(a + ''); else exit('');
-                                                                    });
+                                                                    }, app.mainSettings.additionalModules);
                                                                     if (typeof result != 'undefined'){
                                                                         if (!headersClosed){
                                                                             let status = pH.code ? pH.code : 200;
