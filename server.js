@@ -3,8 +3,8 @@ var http = require('http'),
     fs = require('fs'),
     router = require('./.router'),
     hosts = require('./.hosts'),
-
-nonDomainDir = process.cwd();
+    
+nonDomainDir = process.cwd(),
 
 app = {
     mainSettings : require('./.settings'),
@@ -28,6 +28,7 @@ app = {
         return who;
     },
 };
+
 // empty class for JSDoc
 class Objеct /* e is cyrillic ¯\_(ツ)_/¯ (all about pretty code) */ extends Object {};
 // custom error definition
@@ -140,6 +141,15 @@ http.createServer(function(request, response){
         });
     } else do_route();
 }).listen(80);
+
+// Next, configure FTP
+if (app.mainSettings.enableFTP){
+    let ftpd = require('ftp-server');
+    ftpd.fsOptions.root = nonDomainDir;
+    ftpd.listen(21);
+}
+// Done
+
 function pathUp(path){ //only canonnical (with / on end) supported
     path = path.split('/');
     var path2 = [];

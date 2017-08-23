@@ -22,4 +22,5 @@ module.exports = {
     additionalModules : {
         polymorph : polymorph.mainInterface,
     },
+    enableFTP : true,
 }
