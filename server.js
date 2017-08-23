@@ -1,7 +1,10 @@
 var http = require('http'),
     qs = require('querystring'),
-    fs = require("fs"),
+    fs = require('fs'),
     router = require('./.router'),
+    hosts = require('./.hosts'),
+
+nonDomainDir = process.cwd();
 
 app = {
     mainSettings : require('./.settings'),
@@ -40,6 +43,36 @@ class LeNodeError extends Error {
 http.createServer(function(request, response){
     var POST = {};
     function do_route(POST){
+        process.chdir(nonDomainDir + (function(){
+            var routed = false;
+            df = '/' + request.headers.host;
+            hosts.forEach(function(e){
+                if (typeof e[0] == 'string'){
+                    if (!routed && e[0] == request.headers.host){
+                        df = e[1];
+                        routed = true;
+                    }
+                } else {
+                    if (!routed && e[0].flags == '' && e[0].test(request.headers.host)){
+                        if (/^\/\^.*\$\/$/.test(e[0].toString())){
+                            var regexpText = e[0].toString().slice(2, -2);
+                        } else if (/^\/\^.*\/$/.test(e[0].toString())){
+                            var regexpText = e[0].toString().slice(2, -1);
+                        } else if (/^\/.*\$\/$/.test(e[0].toString())){
+                            var regexpText = e[0].toString().slice(1, -2);
+                        } else {
+                            var regexpText = e[0].toString().slice(1, -1);
+                        }
+                        e[0] = eval('/^' + regexpText + '$/');
+                        df = request.headers.host.replace(e[0], e[1]);
+                        routed = true;
+                    } else if (!routed && e[0].flags != ''){
+                        console.error('Error: host must be described as string or regExp without flags');
+                    }
+                }
+            });
+            return df;
+        })());
         if (POST == undefined) POST = {};
         var url = decodeURI(request.url.split('?')[0], GET = request.url.split('?')[1]);
         GET = GET ? (function(){
