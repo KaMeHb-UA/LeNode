@@ -1,0 +1,1 @@
+exit('Sorry, but ' + headers.host + ' does not exists for now. You can wait ~5 mins, but you know, changes will not occur');
