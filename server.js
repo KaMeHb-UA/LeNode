@@ -168,7 +168,7 @@ if (app.mainSettings.enableFTP){
                                         var a = path.split('/');
                                         if (a.length == 1) return;
                                         return a[1];
-                                    })())) super.chdir(path); else reject({message: 'Hacker? Hmm... interesting...'});
+                                    })())) super.chdir(path);
                                 }
                                 list(path = '.'){
                                     var rPath = _getRealPath(path, this);
@@ -184,7 +184,15 @@ if (app.mainSettings.enableFTP){
                                         }
                                     });
                                 }
-                                //*/ // DO: get, write, read, delete, mkdir, rename, chmod. Test it without methods above
+                                //*/ // DO: delete, mkdir, rename, chmod. Test it without methods above
+                                write(fileName, {append = false, start = undefined} = {}){
+                                    var fn = fileName.split('/');
+                                    if (fileName == '/' || !(fn[1] && compare(settings[data.username].direct, fn[1]))) return fs.createWriteStream('/dev/null', {mode: 0o000}); else return super.write(fileName, {append: append, start: start});
+                                }
+                                read(fileName, {start = undefined} = {}){
+                                    var fn = fileName.split('/');
+                                    if (fileName == '/' || !(fn[1] && compare(settings[data.username].direct, fn[1]))) return fs.createReadStream('/dev/null', {mode: 0o000}); else return super.read(fileName, {start: start});
+                                }
                             })(data.connection, {root:nonDomainDir})
                         });
                     } else {
