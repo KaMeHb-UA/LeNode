@@ -2,9 +2,9 @@
     "name": "lenode",
     "version": "1.0.0-f",
     "main": "./server.js",
-    "repository" :{
-        "type" : "git",
-        "url" : "https://github.com/KaMeHb-UA/LeNode.git"
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/KaMeHb-UA/LeNode.git"
     },
     "description": "NodeJS based minimalistic web-server",
     "license": "MIT",
@@ -15,5 +15,9 @@
         "tiny",
         "lesser",
         "minimalistic"
-    ]
+    ],
+    "dependencies": {
+        "del-symlinks": "^0.1.2",
+        "ftp-srv": "^2.11.2"
+    }
 }
