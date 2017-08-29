@@ -1,7 +1,6 @@
 var http = require('http'),
     qs = require('querystring'),
     fs = require('fs'),
-    router = require('./.router'),
     hosts = require('./.hosts'),
     
 nonDomainDir = process.cwd(),
@@ -27,6 +26,14 @@ app = {
         }
         return who;
     },
+    evalSafe: function(text){
+        // potential security issue. Will be fixed in release
+        return eval(text);
+    },
+    defaultRouter: [
+        [ /.*\/\.indexes\/*$/, '/403.code' ],
+        [ /^\/?\.router\.js\/*$/, '/403.code' ],
+    ],
 };
 
 // empty class for JSDoc
@@ -64,7 +71,7 @@ http.createServer(function(request, response){
                         } else {
                             var regexpText = e[0].toString().slice(1, -1);
                         }
-                        e[0] = eval('/^' + regexpText + '$/');
+                        e[0] = app.evalSafe('/^' + regexpText + '$/');
                         df = request.headers.host.replace(e[0], e[1]);
                         routed = true;
                     } else if (!routed && e[0].flags != ''){
@@ -111,7 +118,7 @@ http.createServer(function(request, response){
             status = b;
             response.writeHead(status, headers);
             HeadersSent = true;
-        }, (err) => {
+        }, app.defaultRouter, (err) => {
             if (err) console.error(err);
         });
     }
@@ -140,7 +147,7 @@ if (app.mainSettings.enableFTP){
         fs.readFile(nonDomainDir + '/.ftp.js', 'utf8', (err, settings) => {
             if (!err){
                 try{
-                    eval(settings);
+                    app.evalSafe(settings);
                     if(settings[data.username] && settings[data.username].pass && settings[data.username].pass == data.password){
                         let compare = (strReg, compareWith) => {
                             if (!compareWith) return true;
@@ -288,197 +295,207 @@ function getIndexes(url, callback){
  * @param {Objеct} headers Associative array like object with all the request headers
  * @param {String} IP Remote user IP adress
  * @param {function(Objеct, number=):void} writeHead Writes headers to the queue (exist headers will be replaced) and/or sets responce code. Works until headers are not sent
+ * @param {Array<Array<(String|RegExp)>>} router Specifies a router to be used by default
  * @param {function(LeNodeError):void} callback Standard NodeJS callback
  * @return {Void}
  */
-function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead, callback){
+function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead, router, callback){
     if (app.mainSettings.advancedLogging) console.log(IP + ' requested a page ' + url + ' with GET ' + JSON.stringify(GET) + ' and POST ' + JSON.stringify(POST) + ' arguments');
     var isFileExecutable = false;
-    (function(){
-        var routed = false;
-        router.forEach(function(e){
-            if (typeof e[0] == 'string'){
-                if (!routed && e[0] == url){
-                    url = e[1];
-                    if (e[2]){
-                        isFileExecutable = true;
-                    }
-                    routed = true;
-                }
-            } else {
-                if (!routed && e[0].test(url)){
-                    url = url.replace(e[0], e[1]);
-                    if (e[2]){
-                        isFileExecutable = true;
-                    }
-                    routed = true;
-                }
-            }
-        });
-    })();
-    if (url == '/403.code') throwError(403, 'Not Allowed');
-    fs.lstat('.' + url, (err, stats) => {
+    fs.readFile('./.router', 'utf8', (err, contents) => {
         if (!err){
-            if(stats.isFile() && !isFileExecutable){
-                fs.readFile('.' + url, (err, buffer) => {
-                    if (!err){
-                        writeHead({'Content-Type': app.getMime(url)});
-                        exit(buffer, true);
-                        callback(null);
-                    } else {
-                        throwError(404, 'Not Found');
-                        callback(new LeNodeError('cannot read file ' + url));
-                    }
-                });
-            } else if(stats.isFile()){
-                fs.readFile('.' + url, 'utf8', (err, contents) => {
-                    if (!err){
-                        var pH = {}, headersClosed = false;
-                        try{
-                            eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
-                                varStr = '';
-                                for(var i in app.mainSettings.additionalModules){
-                                    varStr += 'var ' + i + ' = addons["' + i + '"];\n';
-                                }
-                                return varStr + 'addons = undefined;\n';
-                            })() + contents + '}');
-                            try{
-                                let result = page(function(a){
-                                    if (!headersClosed){
-                                        headersClosed = true;
-                                        let status = pH.code ? pH.code : 200;
-                                        delete pH.code;
-                                        writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
-                                    }
-                                    write(a + '');
-                                }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, function(a){
-                                    if (!headersClosed){
-                                        let status = pH.code ? pH.code : 200;
-                                        delete pH.code;
-                                        writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
-                                    }
-                                    if (typeof a != 'undefined') exit(a + ''); else exit('');
-                                }, app.mainSettings.additionalModules);
-                                if (typeof result != 'undefined'){
-                                    if (!headersClosed){
-                                        let status = pH.code ? pH.code : 200;
-                                        delete pH.code;
-                                        writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
-                                    }
-                                    exit(result + '');
-                                }
-                                callback(null);
-                            } catch (e){
-                                exit('Unable to load file');
-                                callback(new LeNodeError('Error in synchronous part of page ' + url));
-                            }
-                        } catch (e){
-                            exit('Unable to load file');
-                            callback(new LeNodeError('syntax error at file ' + url));
+            try{
+                router = app.evalSafe(contents);
+            } catch(e){
+                console.error('File ' + nonDomainDir + '/.router is not configured propertly');
+            }
+        }
+        (function(){
+            var routed = false;
+            router.forEach(function(e){
+                if (typeof e[0] == 'string'){
+                    if (!routed && e[0] == url){
+                        url = e[1];
+                        if (e[2]){
+                            isFileExecutable = true;
                         }
-                    } else {
-                        exit('Unable to load file');
-                        callback(new LeNodeError('cannot read file ' + url));
+                        routed = true;
                     }
-                });
-            } else {
-                if (/\/$/.test(url)){
-                    getIndexes(url, (err, indexes) => {
+                } else {
+                    if (!routed && e[0].test(url)){
+                        url = url.replace(e[0], e[1]);
+                        if (e[2]){
+                            isFileExecutable = true;
+                        }
+                        routed = true;
+                    }
+                }
+            });
+        })();
+        if (url == '/403.code') throwError(403, 'Not Allowed');
+        fs.lstat('.' + url, (err, stats) => {
+            if (!err){
+                if(stats.isFile() && !isFileExecutable){
+                    fs.readFile('.' + url, (err, buffer) => {
                         if (!err){
-                            var tmpStack = [];
-                            for (var i in indexes){
-                                tmpStack.push(i);
-                            }
-                            (function retFirstIndex(i, url){
-                                if (i != tmpStack.length){
-                                    fs.access('.' + url + tmpStack[i], (err) => {
-                                        if (!err){
-                                            ((foundIndex) => {
-                                                fs.readFile(foundIndex.name, foundIndex.charset, (err, contents) => {
-                                                    if (!err){
-                                                        if (foundIndex.executable){
-                                                            let pH = {}, headersClosed = false;
-                                                            try{
-                                                                eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
-                                                                    varStr = '';
-                                                                    for(var i in app.mainSettings.additionalModules){
-                                                                        varStr += 'var ' + i + ' = addons["' + i + '"];\n';
-                                                                    }
-                                                                    return varStr + 'addons = undefined;\n';
-                                                                })() + contents + '}');
-                                                                try{
-                                                                    let result = page(function(a){
-                                                                        if (!headersClosed){
-                                                                            headersClosed = true;
-                                                                            let status = pH.code ? pH.code : 200;
-                                                                            delete pH.code;
-                                                                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
-                                                                        }
-                                                                        write(a + '');
-                                                                    }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, function(a){
-                                                                        if (!headersClosed){
-                                                                            let status = pH.code ? pH.code : 200;
-                                                                            delete pH.code;
-                                                                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
-                                                                        }
-                                                                        if (typeof a != 'undefined') exit(a + ''); else exit('');
-                                                                    }, app.mainSettings.additionalModules);
-                                                                    if (typeof result != 'undefined'){
-                                                                        if (!headersClosed){
-                                                                            let status = pH.code ? pH.code : 200;
-                                                                            delete pH.code;
-                                                                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
-                                                                        }
-                                                                        exit(result + '');
-                                                                    }
-                                                                    callback(null);
-                                                                } catch (e){
-                                                                    throwError(404, 'Not Found');
-                                                                    callback(new LeNodeError('Error in synchronous part of page ' + url));
-                                                                }
-                                                            } catch (e){
-                                                                throwError(404, 'Not Found');
-                                                                callback(new LeNodeError('syntax error at file ' + url));
-                                                            }
-                                                        } else {
-                                                            writeHead({'Content-Type': 'text/html;charset=' + foundIndex.charset}, 200);
-                                                            exit(contents);
-                                                            callback(null);
-                                                        }
-                                                    } else {
-                                                        throwError(404, 'Not Found');
-                                                        callback(new LeNodeError('cannot read index file ' + foundIndex.name));
-                                                    }
-                                                });
-                                            })({
-                                                name : '.' + url + tmpStack[i],
-                                                executable : !!(indexes[tmpStack[i]].executable),
-                                                charset : indexes[tmpStack[i]].charset
-                                            });
-                                        } else retFirstIndex(++i, url);
-                                    });
-                                } else {
-                                    throwError(404, 'Not Found');
-                                    callback(null);
-                                }
-                            })(0, url);
+                            writeHead({'Content-Type': app.getMime(url)});
+                            exit(buffer, true);
+                            callback(null);
                         } else {
                             throwError(404, 'Not Found');
-                            callback(null);
+                            callback(new LeNodeError('cannot read file ' + url));
+                        }
+                    });
+                } else if(stats.isFile()){
+                    fs.readFile('.' + url, 'utf8', (err, contents) => {
+                        if (!err){
+                            var pH = {}, headersClosed = false;
+                            try{
+                                eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
+                                    varStr = '';
+                                    for(var i in app.mainSettings.additionalModules){
+                                        varStr += 'var ' + i + ' = addons["' + i + '"];\n';
+                                    }
+                                    return varStr + 'addons = undefined;\n';
+                                })() + contents + '}');
+                                try{
+                                    let result = page(function(a){
+                                        if (!headersClosed){
+                                            headersClosed = true;
+                                            let status = pH.code ? pH.code : 200;
+                                            delete pH.code;
+                                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                                        }
+                                        write(a + '');
+                                    }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, function(a){
+                                        if (!headersClosed){
+                                            let status = pH.code ? pH.code : 200;
+                                            delete pH.code;
+                                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                                        }
+                                        if (typeof a != 'undefined') exit(a + ''); else exit('');
+                                    }, app.mainSettings.additionalModules);
+                                    if (typeof result != 'undefined'){
+                                        if (!headersClosed){
+                                            let status = pH.code ? pH.code : 200;
+                                            delete pH.code;
+                                            writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=utf-8'}), status);
+                                        }
+                                        exit(result + '');
+                                    }
+                                    callback(null);
+                                } catch (e){
+                                    exit('Unable to load file');
+                                    callback(new LeNodeError('Error in synchronous part of page ' + url));
+                                }
+                            } catch (e){
+                                exit('Unable to load file');
+                                callback(new LeNodeError('syntax error at file ' + url));
+                            }
+                        } else {
+                            exit('Unable to load file');
+                            callback(new LeNodeError('cannot read file ' + url));
                         }
                     });
                 } else {
-                    writeHead({'Location': url + '/'}, 302);
-                    exit('');
-                    callback(null);
+                    if (/\/$/.test(url)){
+                        getIndexes(url, (err, indexes) => {
+                            if (!err){
+                                var tmpStack = [];
+                                for (var i in indexes){
+                                    tmpStack.push(i);
+                                }
+                                (function retFirstIndex(i, url){
+                                    if (i != tmpStack.length){
+                                        fs.access('.' + url + tmpStack[i], (err) => {
+                                            if (!err){
+                                                ((foundIndex) => {
+                                                    fs.readFile(foundIndex.name, foundIndex.charset, (err, contents) => {
+                                                        if (!err){
+                                                            if (foundIndex.executable){
+                                                                let pH = {}, headersClosed = false;
+                                                                try{
+                                                                    eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
+                                                                        varStr = '';
+                                                                        for(var i in app.mainSettings.additionalModules){
+                                                                            varStr += 'var ' + i + ' = addons["' + i + '"];\n';
+                                                                        }
+                                                                        return varStr + 'addons = undefined;\n';
+                                                                    })() + contents + '}');
+                                                                    try{
+                                                                        let result = page(function(a){
+                                                                            if (!headersClosed){
+                                                                                headersClosed = true;
+                                                                                let status = pH.code ? pH.code : 200;
+                                                                                delete pH.code;
+                                                                                writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
+                                                                            }
+                                                                            write(a + '');
+                                                                        }, GET, POST, REQUEST, headers, IP, function(header){pH=app.extends(header, pH);}, function(a){
+                                                                            if (!headersClosed){
+                                                                                let status = pH.code ? pH.code : 200;
+                                                                                delete pH.code;
+                                                                                writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
+                                                                            }
+                                                                            if (typeof a != 'undefined') exit(a + ''); else exit('');
+                                                                        }, app.mainSettings.additionalModules);
+                                                                        if (typeof result != 'undefined'){
+                                                                            if (!headersClosed){
+                                                                                let status = pH.code ? pH.code : 200;
+                                                                                delete pH.code;
+                                                                                writeHead(app.extends(pH, {'Content-Type': 'text/html;charset=' + foundIndex.charset}), status);
+                                                                            }
+                                                                            exit(result + '');
+                                                                        }
+                                                                        callback(null);
+                                                                    } catch (e){
+                                                                        throwError(404, 'Not Found');
+                                                                        callback(new LeNodeError('Error in synchronous part of page ' + url));
+                                                                    }
+                                                                } catch (e){
+                                                                    throwError(404, 'Not Found');
+                                                                    callback(new LeNodeError('syntax error at file ' + url));
+                                                                }
+                                                            } else {
+                                                                writeHead({'Content-Type': 'text/html;charset=' + foundIndex.charset}, 200);
+                                                                exit(contents);
+                                                                callback(null);
+                                                            }
+                                                        } else {
+                                                            throwError(404, 'Not Found');
+                                                            callback(new LeNodeError('cannot read index file ' + foundIndex.name));
+                                                        }
+                                                    });
+                                                })({
+                                                    name : '.' + url + tmpStack[i],
+                                                    executable : !!(indexes[tmpStack[i]].executable),
+                                                    charset : indexes[tmpStack[i]].charset
+                                                });
+                                            } else retFirstIndex(++i, url);
+                                        });
+                                    } else {
+                                        throwError(404, 'Not Found');
+                                        callback(null);
+                                    }
+                                })(0, url);
+                            } else {
+                                throwError(404, 'Not Found');
+                                callback(null);
+                            }
+                        });
+                    } else {
+                        writeHead({'Location': url + '/'}, 302);
+                        exit('');
+                        callback(null);
+                    }
                 }
+            } else {
+                throwError(404, 'Not Found');
+                callback(null);
             }
-        } else {
-            throwError(404, 'Not Found');
-            callback(null);
-        }
+        });
+        setTimeout(function(){
+            exit('');
+        }, app.mainSettings.serverTimeout);
     });
-    setTimeout(function(){
-        exit('');
-    }, app.mainSettings.serverTimeout);
 }

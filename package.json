@@ -1,6 +1,6 @@
 {
     "name": "lenode",
-    "version": "1.2.0-RC2",
+    "version": "1.2.0-RC3",
     "main": "./server.js",
     "repository": {
         "type": "git",
