@@ -28,9 +28,9 @@ app = {
     },
     evalSafe: function(text){
         return eval(
-            '(function(app, router, window, http, fs, hosts, qs, process, exit, callback, err, contents, data, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead){'
-            + text +
-            '})({mainSettings: app.mainSettings, getMime: app.getMime, extends: app.extends, defaultRouter: app.defaultRouter})'
+            '(function(app, router, window, http, fs, hosts, qs, process, exit, callback, err, contents, data, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead){ return (' +
+            text
+            + ')})({mainSettings: app.mainSettings, getMime: app.getMime, extends: app.extends, defaultRouter: app.defaultRouter})'
         );
     },
     defaultRouter: [
