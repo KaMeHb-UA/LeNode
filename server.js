@@ -150,7 +150,7 @@ if (app.mainSettings.enableFTP){
         fs.readFile(nonDomainDir + '/.ftp.js', 'utf8', (err, settings) => {
             if (!err){
                 try{
-                    app.evalSafe(settings);
+                    eval(settings);
                     if(settings[data.username] && settings[data.username].pass && settings[data.username].pass == data.password){
                         let compare = (strReg, compareWith) => {
                             if (!compareWith) return true;
