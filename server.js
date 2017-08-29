@@ -27,8 +27,11 @@ app = {
         return who;
     },
     evalSafe: function(text){
-        // potential security issue. Will be fixed in release
-        return eval(text);
+        return eval(
+            '(function(app, router, window, http, fs, hosts, qs, process, exit, callback, err, contents, data, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead){'
+            + text +
+            '})({mainSettings: app.mainSettings, getMime: app.getMime, extends: app.extends, defaultRouter: app.defaultRouter})'
+        );
     },
     defaultRouter: [
         [ /.*\/\.indexes\/*$/, '/403.code' ],
