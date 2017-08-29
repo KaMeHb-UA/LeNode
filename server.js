@@ -150,19 +150,23 @@ if (app.mainSettings.enableFTP){
                                 return strReg.test(compareWith);
                             }
                         },
-                        //* fs private method (gets real directory with _resolvePath())
+                        //* fs private methods (remove first slash to comment it)
                         _getRealPath = function(path, _this){
                             path = _this._resolvePath(path).fsPath.slice(nonDomainDir.length).replace(/\\/g, '/');
                             if (path[0] != '/') path = '/' + path;
                             return path;
+                        },
+                        _notInDirect = function(path){
+                            var fn = path.split('/');
+                            return path == '/' || !(fn[1] && compare(settings[data.username].direct, fn[1]));
                         };
-                        //*/
+                        //*/;
                         resolve({
                             fs : new (class extends FTPD.FileSystem{
                                 constructor(connection, {root, cwd} = {}){
                                     super(connection, {root: root, cwd: cwd});
                                 }
-                                //* must to block some functions for different accounts
+                                // must to block some functions for different accounts
                                 chdir(path = '.'){
                                     if(compare(settings[data.username].direct, (() => {
                                         var a = path.split('/');
@@ -184,14 +188,23 @@ if (app.mainSettings.enableFTP){
                                         }
                                     });
                                 }
-                                //*/ // DO: delete, mkdir, rename, chmod. Test it without methods above
                                 write(fileName, {append = false, start = undefined} = {}){
-                                    var fn = fileName.split('/');
-                                    if (fileName == '/' || !(fn[1] && compare(settings[data.username].direct, fn[1]))) return fs.createWriteStream('/dev/null', {mode: 0o000}); else return super.write(fileName, {append: append, start: start});
+                                    if (_notInDirect(fileName)) return fs.createWriteStream('/dev/null', {mode: 0o000}); else return super.write(fileName, {append: append, start: start});
                                 }
                                 read(fileName, {start = undefined} = {}){
-                                    var fn = fileName.split('/');
-                                    if (fileName == '/' || !(fn[1] && compare(settings[data.username].direct, fn[1]))) return fs.createReadStream('/dev/null', {mode: 0o000}); else return super.read(fileName, {start: start});
+                                    if (_notInDirect(fileName)) return fs.createReadStream('/dev/null', {mode: 0o000}); else return super.read(fileName, {start: start});
+                                }
+                                delete(path){
+                                    if (_notInDirect(path)) return; else return super.delete(path);
+                                }
+                                mkdir(path){
+                                    if (_notInDirect(path)) return; else return super.mkdir(path);
+                                }
+                                rename(from, to){
+                                    if (_notInDirect(from) || _notInDirect(to)) return; else return super.rename(from, to);
+                                }
+                                chmod(path, mode){
+                                    if (_notInDirect(path)) return; else return super.chmod(path, mode);
                                 }
                             })(data.connection, {root:nonDomainDir})
                         });

@@ -1,6 +1,6 @@
 {
     "name": "lenode",
-    "version": "1.0.0-f",
+    "version": "1.2.0-RC2",
     "main": "./server.js",
     "repository": {
         "type": "git",
@@ -17,7 +17,6 @@
         "minimalistic"
     ],
     "dependencies": {
-        "del-symlinks": "^0.1.2",
         "ftp-srv": "^2.11.2"
     }
 }
