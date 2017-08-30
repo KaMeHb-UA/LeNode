@@ -2,6 +2,7 @@ var http = require('http'),
     qs = require('querystring'),
     fs = require('fs'),
     hosts = require('./.hosts'),
+    mkdirp = require('mkdirp'),
     
 nonDomainDir = process.cwd(),
 
@@ -169,7 +170,9 @@ if (app.mainSettings.enableFTP){
                         _notInDirect = function(path){
                             var fn = path.split('/');
                             return path == '/' || !(fn[1] && compare(settings[data.username].direct, fn[1]));
-                        };
+                        },
+                        _checkFileExists = s => new Promise(r => fs.access(s, fs.F_OK, e => r(!e))),
+                        _mkdirp = s => new Promise(r => mkdirp(s, e => r(!e)));
                         //*/;
                         resolve({
                             fs : new (class extends FTPD.FileSystem{
@@ -177,12 +180,19 @@ if (app.mainSettings.enableFTP){
                                     super(connection, {root: root, cwd: cwd});
                                 }
                                 // must to block some functions for different accounts
+                                get(fileName){
+                                    return _checkFileExists(this._resolvePath(fileName).fsPath).then((exists) => {
+                                        if (!exists) return false; else return super.get(fileName);
+                                    });
+                                }
                                 chdir(path = '.'){
                                     if(compare(settings[data.username].direct, (() => {
                                         var a = path.split('/');
                                         if (a.length == 1) return;
                                         return a[1];
-                                    })())) super.chdir(path);
+                                    })())) return _mkdirp(this._resolvePath(path).fsPath).then(s => {
+                                        if (!s) return false; else return super.chdir(path);
+                                    })
                                 }
                                 list(path = '.'){
                                     var rPath = _getRealPath(path, this);
@@ -198,9 +208,38 @@ if (app.mainSettings.enableFTP){
                                         }
                                     });
                                 }
+                                /*
                                 write(fileName, {append = false, start = undefined} = {}){
                                     if (_notInDirect(fileName)) return fs.createWriteStream('/dev/null', {mode: 0o000}); else return super.write(fileName, {append: append, start: start});
                                 }
+                                /*///*
+                                write(fileName, {append = false, start = undefined} = {}){
+                                    var fsp = this._resolvePath(fileName).fsPath;
+                                    return _checkFileExists(fsp).then((exists) => {
+                                        if (_notInDirect(fileName)) return fs.createWriteStream('/dev/null', {mode: 0o000}); else {
+                                            if (exists) return super.write(fileName, {append: append, start: start}); else {
+                                                return _mkdirp((function(a){
+                                                    a = a.split('/');
+                                                    if (a.length > 1){
+                                                        a[a.length - 1] = '';
+                                                    }
+                                                    a = a.join('/');
+                                                    a = a.split('\\');
+                                                    if (a.length > 1){
+                                                        a[a.length - 1] = '';
+                                                    }
+                                                    return a.join('\\');
+                                                })(fsp)).then(s => {
+                                                    if (!s) return fs.createWriteStream('/dev/null', {mode: 0o000}); else {
+                                                        fs.writeFileSync(fsp, Buffer.alloc(0));
+                                                        return super.write(fileName, {append: append, start: start});
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    });
+                                }
+                                //*/
                                 read(fileName, {start = undefined} = {}){
                                     if (_notInDirect(fileName)) return fs.createReadStream('/dev/null', {mode: 0o000}); else return super.read(fileName, {start: start});
                                 }

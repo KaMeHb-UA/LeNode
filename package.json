@@ -17,6 +17,7 @@
         "minimalistic"
     ],
     "dependencies": {
-        "ftp-srv": "^2.11.2"
+        "ftp-srv": "^2.11.2",
+        "mkdirp": "^0.5.1"
     }
 }
