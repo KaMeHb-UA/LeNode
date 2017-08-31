@@ -1,0 +1,24 @@
+{
+    "restartable": "rs",
+    "ignore": [
+        ".git"
+    ],
+    "verbose": true,
+    "execMap": {
+        "js": "node --harmony"
+    },
+    "events": {
+        "restart": "echo '\\033[36m[LeNode]\\033[0m server restarted due to: '$FILENAME"
+    },
+    "watch": [
+        ".modules/",
+        "server.js",
+        "nodemon.json",
+        ".hosts.js",
+        ".settings.js"
+    ],
+    "env": {
+        "NODE_ENV": "development"
+    },
+    "ext": "js"
+}
