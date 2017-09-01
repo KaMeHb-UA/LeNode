@@ -7,9 +7,6 @@
     "execMap": {
         "js": "node --harmony"
     },
-    "events": {
-        "restart": "echo '\\033[36m[LeNode]\\033[0m server restarted due to: '$FILENAME"
-    },
     "watch": [
         ".modules/",
         "server.js",
