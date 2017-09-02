@@ -156,12 +156,35 @@ http.createServer(function(request, response){
 
 if (app.mainSettings.enableFTP){
     let FTPD = require('ftp-srv'),
+        stream = require('stream'),
         ftpServer = new FTPD('ftp://0.0.0.0:21', {
-            log : {
-                info : (data, message) => {
-                    if (message) app.log('FTP', message);
-                }
-            }
+            log : require('bunyan').
+            /* is a ftp-srv's dependence so no need to include it as dependence directly */
+            createLogger({
+                name: 'FTP',
+                streams: [
+                    {
+                        level: 'info',
+                        stream: new stream.Writable({
+                            write:(a,b,c)=>{
+                                d = JSON.parse(a);
+                                if (d.level >=50){
+                                    app.err(d.name, d.msg + (()=>{
+                                        if(/Error:/.test(d.err.stack)) return ':' + d.err.stack.slice(6); else return d.err.stack
+                                    })())
+                                } else if (d.level >=40){
+                                    app.warn(d.name, d.msg)
+                                } else {
+                                    app.log(d.name, d.msg)
+                                }
+                                c();
+                            }
+                        })
+                    },
+                    {level:'warn',stream:new stream.Writable({write: (a,b,c)=>{c();}})},
+                    {level:'error',stream:new stream.Writable({write: (a,b,c)=>{c();}})}
+                ]
+            })
         });
     ftpServer.on('login', (data, resolve, reject) => {
         fs.readFile(nonDomainDir + '/.ftp.js', 'utf8', (err, settings) => {
