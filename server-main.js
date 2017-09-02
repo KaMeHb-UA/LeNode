@@ -4,6 +4,7 @@ var http = require('http'),
     hosts = require('./.hosts'),
     mkdirp = require('mkdirp'),
     dateTime = require('node-datetime'),
+    colors = require('colors'),
     
 nonDomainDir = process.cwd(),
 projectName = (function(a){a=a.split('/');a=a[a.length-1];a=a.split('\\');return a[a.length-1];})(nonDomainDir),
@@ -41,13 +42,13 @@ app = {
         [ /^\/?\.router\.js\/*$/, '/403.code' ],
     ],
     log: function(modulename, message){
-        console.log('\\033[36m' + dateTime.create().format('[d-m-y H:M:S]') + '\\033[32m ' + projectName + ' ' + modulename + ':\\033[0m ' + message);
+        console.log(dateTime.create().format('[d-m-y H:M:S]').cyan + ' ' + projectName.green + ' ' + modulename.green + ': '.green + message);
     },
     warn: function(modulename, message){
-        console.log('\\033[36m' + dateTime.create().format('[d-m-y H:M:S]') + '\\033[33m ' + projectName + ' ' + modulename + ' warning:\\033[0m ' + message);
+        console.log(dateTime.create().format('[d-m-y H:M:S]').cyan + ' ' + projectName.yellow + ' ' + modulename.yellow + ' warning: '.yellow + message);
     },
     err: function(modulename, message){
-        console.log('\\033[36m' + dateTime.create().format('[d-m-y H:M:S]') + '\\033[31m ' + projectName + ' ' + modulename + ' error:\\033[0m ' + message);
+        console.log(dateTime.create().format('[d-m-y H:M:S]').cyan + ' ' + projectName.red + ' ' + modulename.red + ' error: '.red + message);
     },
 };
 
