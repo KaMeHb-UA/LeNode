@@ -69,7 +69,7 @@ http.createServer(function(request, response){
     function do_route(POST){
         process.chdir(nonDomainDir + (function(){
             var routed = false;
-            df = '/' + request.headers.host;
+            var df = '/' + request.headers.host;
             hosts.forEach(function(e){
                 if (typeof e[0] == 'string'){
                     if (!routed && e[0] == request.headers.host){
@@ -98,6 +98,7 @@ http.createServer(function(request, response){
             return df;
         })());
         if (POST == undefined) POST = {};
+        var GET;
         var url = decodeURI(request.url.split('?')[0], GET = request.url.split('?')[1]);
         GET = GET ? (function(){
             var params = {};
@@ -167,7 +168,7 @@ if (app.mainSettings.enableFTP){
                         level: 'info',
                         stream: new stream.Writable({
                             write:(a,b,c)=>{
-                                d = JSON.parse(a);
+                                var d = JSON.parse(a);
                                 if (d.level >=50){
                                     app.err(d.name, d.msg + (()=>{
                                         if(/Error:/.test(d.err.stack)) return ':' + d.err.stack.slice(6); else return d.err.stack
@@ -433,7 +434,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                             var pH = {}, headersClosed = false;
                             try{
                                 eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
-                                    varStr = '';
+                                    var varStr = '';
                                     for(var i in app.mainSettings.additionalModules){
                                         varStr += 'var ' + i + ' = addons["' + i + '"];\n';
                                     }
@@ -497,7 +498,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                                                 let pH = {}, headersClosed = false;
                                                                 try{
                                                                     eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
-                                                                        varStr = '';
+                                                                        var varStr = '';
                                                                         for(var i in app.mainSettings.additionalModules){
                                                                             varStr += 'var ' + i + ' = addons["' + i + '"];\n';
                                                                         }
