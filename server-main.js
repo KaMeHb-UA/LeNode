@@ -1,10 +1,10 @@
+require('colors');
 var http = require('http'),
     qs = require('querystring'),
     fs = require('fs'),
     hosts = require('./.hosts'),
     mkdirp = require('mkdirp'),
     dateTime = require('node-datetime'),
-    colors = require('colors'),
     
 nonDomainDir = process.cwd(),
 projectName = (function(a){a=a.split('/');a=a[a.length-1];a=a.split('\\');return a[a.length-1];})(nonDomainDir),
@@ -53,7 +53,7 @@ app = {
 };
 
 // empty class for JSDoc
-class Objеct /* e is cyrillic ¯\_(ツ)_/¯ (all about pretty code) */ extends Object {};
+class Objеct /* 'e' is cyrillic (for JSDoc). ¯\_(ツ)_/¯ All about pretty code */ extends Object {};
 // custom error definition
 class LeNodeError extends Error {
     constructor(message, errno = -1){
@@ -65,7 +65,7 @@ class LeNodeError extends Error {
 }
 
 http.createServer(function(request, response){
-    var POST = {};
+    var POST = new Objеct(); // with cyrillic 'e' instead of {}. Just for ESLint
     function do_route(POST){
         process.chdir(nonDomainDir + (function(){
             var routed = false;
@@ -431,9 +431,9 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                 } else if(stats.isFile()){
                     fs.readFile('.' + url, 'utf8', (err, contents) => {
                         if (!err){
-                            var pH = {}, headersClosed = false;
+                            var pH = {}, headersClosed = false, page = ()=>{};
                             try{
-                                eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
+                                eval('page = (write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + ')=>{' + (function(){
                                     var varStr = '';
                                     for(var i in app.mainSettings.additionalModules){
                                         varStr += 'var ' + i + ' = addons["' + i + '"];\n';
@@ -495,9 +495,9 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                                     fs.readFile(foundIndex.name, foundIndex.charset, (err, contents) => {
                                                         if (!err){
                                                             if (foundIndex.executable){
-                                                                let pH = {}, headersClosed = false;
+                                                                let pH = {}, headersClosed = false, page = ()=>{};
                                                                 try{
-                                                                    eval('function page(write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + '){' + (function(){
+                                                                    eval('page = (write,GET,POST,REQUEST,headers,IP,addHeaders,exit,addons' + ((app.mainSettings.preventImplicitTransfer == '') ? '' : (',' + app.mainSettings.preventImplicitTransfer)) + ')=>{' + (function(){
                                                                         var varStr = '';
                                                                         for(var i in app.mainSettings.additionalModules){
                                                                             varStr += 'var ' + i + ' = addons["' + i + '"];\n';
