@@ -1,4 +1,5 @@
-var polymorph = require('./.modules/polymorph');
+var __appDir = (a=>{a.pop();return a.join('/')})(process.mainModule.filename.split('/')),
+    polymorph = require(__appDir + '/.modules/polymorph');
 module.exports = {
     defaultIndex : /* Default single index file settings */{
         executable : false, // do execute?,

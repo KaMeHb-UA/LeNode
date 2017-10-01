@@ -2,15 +2,21 @@ require('colors');
 var http = require('http'),
     qs = require('querystring'),
     fs = require('fs'),
-    hosts = require('./.hosts'),
+    nonDomainDir = (a=>{a.pop();a.pop();a.pop();return a.join('/')})(process.mainModule.filename.split('/')),
+    hosts = require(nonDomainDir + '/.hosts.js'),
     mkdirp = require('mkdirp'),
     dateTime = require('node-datetime'),
-    
-nonDomainDir = process.cwd(),
-projectName = (function(a){a=a.split('/');a=a[a.length-1];a=a.split('\\');return a[a.length-1];})(nonDomainDir),
 
 app = {
-    mainSettings : require('./.settings'),
+    getDirPart : (dir, countFromEnd)=>{
+        dir = dir.split('/');
+        if(dir[dir.length-1] != ''){
+            if (countFromEnd <= dir.length) return dir[dir.length - (countFromEnd + 1)]; else return false;
+        } else {
+            if (countFromEnd <= dir.length - 1) return dir[dir.length - (countFromEnd + 2)]; else return false;
+        }
+    },
+    mainSettings : require(nonDomainDir + '/.settings'),
     getMime : function(url){
         var got = false, type = '';
         app.mainSettings.mimeTypes.forEach((typeDef) => {
@@ -41,19 +47,45 @@ app = {
         [ /.*\/\.indexes\/*$/, '/403.code' ],
         [ /^\/?\.router\.js\/*$/, '/403.code' ],
     ],
-    log: function(modulename, message){
-        console.log(dateTime.create().format('[d-m-y H:M:S]').cyan + ' ' + projectName.green + ' ' + modulename.green + ': '.green + message);
-    },
-    warn: function(modulename, message){
-        console.log(dateTime.create().format('[d-m-y H:M:S]').cyan + ' ' + projectName.yellow + ' ' + modulename.yellow + ' warning: '.yellow + message);
-    },
-    err: function(modulename, message){
-        console.log(dateTime.create().format('[d-m-y H:M:S]').cyan + ' ' + projectName.red + ' ' + modulename.red + ' error: '.red + message);
-    },
 };
-
+app.version = (a=>{return app.getDirPart(a,0)})(__dirname);
+app.projectName = (a=>{return app.getDirPart(a,2)})(__dirname);
+app.log = (modulename, message)=>{
+    if (!modulename && !message){
+        return false;
+    } else if(modulename && !message){
+        message = modulename;
+        modulename = 'info';
+    }
+    console.log(dateTime.create().format('[d-m-y H:M:S]').cyan + ' ' + app.projectName.green + ' ' + modulename.green + ': '.green + message);
+    return message;
+};
+app.warn = (modulename, message)=>{
+    if (!modulename && !message){
+        return false;
+    } else if(modulename && !message){
+        message = modulename;
+        modulename = '';
+    } else {
+        modulename = ' ' + modulename;
+    }
+    console.log(dateTime.create().format('[d-m-y H:M:S]').cyan + ' ' + app.projectName.yellow + modulename.yellow + ' warning: '.yellow + message);
+    return message;
+};
+app.err = (modulename, message)=>{
+    if (!modulename && !message){
+        return false;
+    } else if(modulename && !message){
+        message = modulename;
+        modulename = '';
+    } else {
+        modulename = ' ' + modulename;
+    }
+    console.log(dateTime.create().format('[d-m-y H:M:S]').cyan + ' ' + app.projectName.red + modulename.red + ' error: '.red + message);
+    return message;
+};
 // empty class for JSDoc
-class Objеct /* 'e' is cyrillic (for JSDoc). ¯\_(ツ)_/¯ All about pretty code */ extends Object {};
+class Objеct /* 'e' is cyrillic. ¯\_(ツ)_/¯ All about pretty code */ extends Object {};
 // custom error definition
 class LeNodeError extends Error {
     constructor(message, errno = -1){
@@ -67,36 +99,6 @@ class LeNodeError extends Error {
 http.createServer(function(request, response){
     var POST = new Objеct(); // with cyrillic 'e' instead of {}. Just for ESLint
     function do_route(POST){
-        process.chdir(nonDomainDir + (function(){
-            var routed = false;
-            var df = '/' + request.headers.host;
-            hosts.forEach(function(e){
-                if (typeof e[0] == 'string'){
-                    if (!routed && e[0] == request.headers.host){
-                        df = e[1];
-                        routed = true;
-                    }
-                } else {
-                    if (!routed && e[0].flags == '' && e[0].test(request.headers.host)){
-                        if (/^\/\^.*\$\/$/.test(e[0].toString())){
-                            var regexpText = e[0].toString().slice(2, -2);
-                        } else if (/^\/\^.*\/$/.test(e[0].toString())){
-                            var regexpText = e[0].toString().slice(2, -1);
-                        } else if (/^\/.*\$\/$/.test(e[0].toString())){
-                            var regexpText = e[0].toString().slice(1, -2);
-                        } else {
-                            var regexpText = e[0].toString().slice(1, -1);
-                        }
-                        e[0] = app.evalSafe('/^' + regexpText + '$/');
-                        df = request.headers.host.replace(e[0], e[1]);
-                        routed = true;
-                    } else if (!routed && e[0].flags != ''){
-                        console.error('Error: host must be described as string or regExp without flags');
-                    }
-                }
-            });
-            return df;
-        })());
         if (POST == undefined) POST = {};
         var GET;
         var url = decodeURI(request.url.split('?')[0], GET = request.url.split('?')[1]);
@@ -135,7 +137,37 @@ http.createServer(function(request, response){
             status = b;
             response.writeHead(status, headers);
             HeadersSent = true;
-        }, app.defaultRouter, (err) => {
+        }, app.defaultRouter,
+        (nonDomainDir + (function(){
+            var routed = false;
+            var df = '/' + request.headers.host;
+            hosts.forEach(function(e){
+                if (typeof e[0] == 'string'){
+                    if (!routed && e[0] == request.headers.host){
+                        df = e[1];
+                        routed = true;
+                    }
+                } else {
+                    if (!routed && e[0].flags == '' && e[0].test(request.headers.host)){
+                        if (/^\/\^.*\$\/$/.test(e[0].toString())){
+                            var regexpText = e[0].toString().slice(2, -2);
+                        } else if (/^\/\^.*\/$/.test(e[0].toString())){
+                            var regexpText = e[0].toString().slice(2, -1);
+                        } else if (/^\/.*\$\/$/.test(e[0].toString())){
+                            var regexpText = e[0].toString().slice(1, -2);
+                        } else {
+                            var regexpText = e[0].toString().slice(1, -1);
+                        }
+                        e[0] = app.evalSafe('/^' + regexpText + '$/');
+                        df = request.headers.host.replace(e[0], e[1]);
+                        routed = true;
+                    } else if (!routed && e[0].flags != ''){
+                        console.error('Error: host must be described as string or regExp without flags');
+                    }
+                }
+            });
+            return df;
+        })()), (err) => {
             if (err) app.err('server', err);
         });
     }
@@ -252,7 +284,7 @@ if (app.mainSettings.enableFTP){
                                 write(fileName, {append = false, start = undefined} = {}){
                                     if (_notInDirect(fileName)) return fs.createWriteStream('/dev/null', {mode: 0o000}); else return super.write(fileName, {append: append, start: start});
                                 }
-                                /*///*
+                                /*/
                                 write(fileName, {append = false, start = undefined} = {}){
                                     var fsp = this._resolvePath(fileName).fsPath;
                                     return _checkFileExists(fsp).then((exists) => {
@@ -324,13 +356,14 @@ function pathUp(path){ //only canonnical (with / on end) supported
 /**
  * Gets indexes
  * @param {String} url The link for getting indexes
+ * @param {String} host Host folder
  * @param {function(LeNodeError, Objеct):void} callback Standard NodeJS callback
  * @return {Void}
  */
-function getIndexes(url, callback){
+function getIndexes(url, host, callback){
     (function getIndexesAsyncRecursively(url, _indexes, callback){
         if (url != '/'){
-            fs.readFile('.' + url + '.indexes', 'utf8', function(err, contents){
+            fs.readFile(host + '/' + url + '.indexes', 'utf8', function(err, contents){
                 if (!err){
                     try {
                         getIndexesAsyncRecursively(pathUp(url), app.extends(JSON.parse(contents), _indexes), callback);
@@ -343,7 +376,7 @@ function getIndexes(url, callback){
                 }
             });
         } else {
-            fs.readFile('./.indexes', 'utf8', function(err, contents){
+            fs.readFile(host + '/.indexes', 'utf8', function(err, contents){
                 if (!err){
                     try {
                         _indexes = app.extends(JSON.parse(contents), _indexes);
@@ -378,18 +411,19 @@ function getIndexes(url, callback){
  * @param {String} IP Remote user IP adress
  * @param {function(Objеct, number=):void} writeHead Writes headers to the queue (exist headers will be replaced) and/or sets responce code. Works until headers are not sent
  * @param {Array<Array<(String|RegExp)>>} router Specifies a router to be used by default
+ * @param {String} host Specifies a host folder to be used for getting files
  * @param {function(LeNodeError):void} callback Standard NodeJS callback
  * @return {Void}
  */
-function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead, router, callback){
+function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, writeHead, router, host, callback){
     if (app.mainSettings.advancedLogging) app.log('server', IP + ' requested a page ' + url + ' with GET ' + JSON.stringify(GET) + ' and POST ' + JSON.stringify(POST) + ' arguments');
     var isFileExecutable = false;
-    fs.readFile('./.router', 'utf8', (err, contents) => {
+    fs.readFile(host + '/.router.js', 'utf8', (err, contents) => {
         if (!err){
             try{
                 router = app.evalSafe(contents);
             } catch(e){
-                console.error('File ' + nonDomainDir + '/.router is not configured propertly');
+                console.error('File ' + host + '/.router.js is not configured propertly');
             }
         }
         (function(){
@@ -415,10 +449,10 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
             });
         })();
         if (url == '/403.code') throwError(403, 'Not Allowed');
-        fs.lstat('.' + url, (err, stats) => {
+        fs.lstat(host + url, (err, stats) => {
             if (!err){
                 if(stats.isFile() && !isFileExecutable){
-                    fs.readFile('.' + url, (err, buffer) => {
+                    fs.readFile(host + url, (err, buffer) => {
                         if (!err){
                             writeHead({'Content-Type': app.getMime(url)});
                             exit(buffer, true);
@@ -429,7 +463,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                         }
                     });
                 } else if(stats.isFile()){
-                    fs.readFile('.' + url, 'utf8', (err, contents) => {
+                    fs.readFile(host + url, 'utf8', (err, contents) => {
                         if (!err){
                             var pH = {}, headersClosed = false, page = ()=>{};
                             try{
@@ -481,7 +515,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                     });
                 } else {
                     if (/\/$/.test(url)){
-                        getIndexes(url, (err, indexes) => {
+                        getIndexes(url, host, (err, indexes) => {
                             if (!err){
                                 var tmpStack = [];
                                 for (var i in indexes){
@@ -489,10 +523,10 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                 }
                                 (function retFirstIndex(i, url){
                                     if (i != tmpStack.length){
-                                        fs.access('.' + url + tmpStack[i], (err) => {
+                                        fs.access(host + url + tmpStack[i], (err) => {
                                             if (!err){
                                                 ((foundIndex) => {
-                                                    fs.readFile(foundIndex.name, foundIndex.charset, (err, contents) => {
+                                                    fs.readFile(host + foundIndex.name, foundIndex.charset, (err, contents) => {
                                                         if (!err){
                                                             if (foundIndex.executable){
                                                                 let pH = {}, headersClosed = false, page = ()=>{};
@@ -549,7 +583,7 @@ function route(exit, write, throwError, url, GET, POST, REQUEST, headers, IP, wr
                                                         }
                                                     });
                                                 })({
-                                                    name : '.' + url + tmpStack[i],
+                                                    name : url + tmpStack[i],
                                                     executable : !!(indexes[tmpStack[i]].executable),
                                                     charset : indexes[tmpStack[i]].charset
                                                 });
