@@ -17,10 +17,14 @@
         "minimalistic"
     ],
     "dependencies": {
+        "colors": "^1.1.2",
         "ftp-srv": "^2.11.2",
         "mkdirp": "^0.5.1",
-        "nodemon": "^1.11.0",
+        "mv": "^2.1.1",
         "node-datetime": "^2.0.0",
-        "colors": "^1.1.2"
+        "nodemon": "^1.11.0",
+        "request": "^2.83.0",
+        "rimraf": "^2.6.2",
+        "unzip": "^0.1.11"
     }
 }
