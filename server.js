@@ -9,7 +9,7 @@ var fs = require('fs'),
     unzip = require('unzip'),
     mkdirp = require('mkdirp'),
     request = require('request');
-(()=>{
+(function startMain(){
     var app = {
         log : (heading, text)=>{
             console.log(dateTime.create().format('[d-m-y H:M:S]').cyan + ' ' + projectName.green + ' ' + heading.green + ': '.green + text);
@@ -98,7 +98,7 @@ var fs = require('fs'),
                                                     startedScript.emit('quit');
                                                     app.log('server', 'will be started after ' + timeout + 'ms...');
                                                     setTimeout(()=>{
-                                                        startServer().once('exit', ()=>{process.exit()})
+                                                        startMain();
                                                     }, timeout);
                                                 });
                                             });
