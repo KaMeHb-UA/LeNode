@@ -90,7 +90,8 @@ var fs = require('fs'),
                                         fs.createReadStream(versionFolder + '.zip').pipe(unzip.Extract({
                                             path: versionFolder
                                         })).on('close', ()=>{
-                                            mv(versionFolder + '/app', projectFolder + '/app', ()=>{
+                                            mv(versionFolder + '/app/' + data.latest, projectFolder + '/app/' + data.latest, ()=>{
+                                                maxV = data.latest;
                                                 rimraf(projectFolder + '/.tmp/', ()=>{
                                                     var timeout = 1000;
                                                     app.warn('server', 'restarting due to update...');
