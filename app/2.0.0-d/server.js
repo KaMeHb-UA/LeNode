@@ -2,14 +2,18 @@ require('colors');
 var http = require('http'),
     qs = require('querystring'),
     fs = require('fs'),
-    nonDomainDir = (a=>{a.pop();a.pop();a.pop();return a.join('/')})(process.mainModule.filename.split('/')),
-    hosts = require(nonDomainDir + '/.hosts.js'),
+    nonDomainDir = (a=>{a.pop();a.pop();return a.join('/')})(__dirname.split(/[\/\\]/));
+    
+global.applicationFolder = __dirname;
+global.projectFolder = nonDomainDir;
+
+var hosts = require(nonDomainDir + '/.hosts.js'),
     mkdirp = require('mkdirp'),
     dateTime = require('node-datetime'),
 
 app = {
     getDirPart : (dir, countFromEnd)=>{
-        dir = dir.split('/');
+        dir = dir.split(/[\/\\]/);
         if(dir[dir.length-1] != ''){
             if (countFromEnd <= dir.length) return dir[dir.length - (countFromEnd + 1)]; else return false;
         } else {
@@ -48,6 +52,7 @@ app = {
         [ /^\/?\.router\.js\/*$/, '/403.code' ],
     ],
 };
+
 app.version = (a=>{return app.getDirPart(a,0)})(__dirname);
 app.projectName = (a=>{return app.getDirPart(a,2)})(__dirname);
 app.log = (modulename, message)=>{
