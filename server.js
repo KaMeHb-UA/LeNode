@@ -2,13 +2,16 @@ require('colors');
 var fs = require('fs'),
     dateTime = require('node-datetime'),
     nodemon = require('nodemon'),
-    projectFolder = (a=>{a.pop();return a.join('/')})(process.mainModule.filename.split('/')),
-    projectName = (a=>{return a[a.length-1]})(projectFolder.split('/')),
+    projectFolder = __dirname,
+    projectName = (a=>{return a[a.length-1]})(projectFolder.split(/[\/\\]/)),
     rimraf = require('rimraf'),
     mv = require('mv'),
     unzip = require('unzip'),
     mkdirp = require('mkdirp'),
     request = require('request');
+
+global.projectFolder = projectFolder;
+
 (function startMain(){
     var app = {
         log : (heading, text)=>{

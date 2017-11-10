@@ -1,6 +1,9 @@
-var __appDir = (a=>{a.pop();return a.join('/')})(process.mainModule.filename.split('/')),
-    __rootDir = (a=>{a.pop();a.pop();return a.join('/')})(__appDir.split('/')),
-    polymorph = require(__appDir + '/.modules/polymorph');
+var __appDir = global.applicationFolder,
+    __rootDir = global.projectFolder,
+    polymorph = require(__appDir + '/.modules/polymorph'),
+    templates = require(__rootDir + '/.modules/templates');
+global.dirs = {__appDir: __appDir, __rootDir: __rootDir};
+var polymorph = require(__appDir + '/.modules/polymorph');
 global.dirs = {__appDir: __appDir, __rootDir: __rootDir};
 module.exports = {
     defaultIndex : /* Default single index file settings */{
